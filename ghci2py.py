@@ -11,6 +11,7 @@ Module for controlling a ghci session from python.
 #-----------------------------------------------------------------------------
 
 
+
 class Ghci2Py:
 
     def __init__(self):
@@ -23,4 +24,4 @@ class Ghci2Py:
         pass
 
     def run(code, verbose=False):
-        pass
+        return "Hello, World (from ghc2py)"
