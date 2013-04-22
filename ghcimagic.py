@@ -136,13 +136,8 @@ class GhciMagics(Magics):
         else:
             code = cell
 
-        pre_call = '''
-        -- <end_pre_call> --
-        '''
-
-        post_call = '''
-        -- <start_post_call> --
-        '''
+        pre_call = ''
+        post_call = ''
 
         code = ' '.join((pre_call, code, post_call))
         try:
