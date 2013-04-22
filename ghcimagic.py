@@ -114,12 +114,23 @@ class GhciMagics(Magics):
             self.shell.push({output: self._ghci.get(output)})
 
     @skip_doctest
+    @magic_arguments()
+    @argument(
+        '-v', '--verbose', action='store_true',
+        help='turn verbosity up')
     @cell_magic
     def ghci(self, line, cell=None, local_ns=None):
         '''
         Execute code in Ghci, and pull some of the results back into the
         Python namespace.
         '''
+
+        args = parse_argstring(self.ghci, line)
+        if args.verbose is None:
+            verbose = False
+        else:
+            verbose = True
+
         if cell is None:
             code = ''
         else:
@@ -135,7 +146,7 @@ class GhciMagics(Magics):
 
         code = ' '.join((pre_call, code, post_call))
         try:
-            text_output = self._ghci.run(code, verbose=False)
+            text_output = self._ghci.run(code, verbose=verbose)
         except (ghci2py.Ghci2PyError) as exception:
             msg = exception.message
             msg = msg.split('-- <end_pre_call> --')[1]
