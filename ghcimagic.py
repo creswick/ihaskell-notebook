@@ -126,10 +126,6 @@ class GhciMagics(Magics):
         '''
 
         args = parse_argstring(self.ghci, line)
-        if args.verbose is None:
-            verbose = False
-        else:
-            verbose = True
 
         if cell is None:
             code = ''
@@ -141,7 +137,7 @@ class GhciMagics(Magics):
 
         code = ' '.join((pre_call, code, post_call))
         try:
-            text_output = self._ghci.run(code, verbose=verbose)
+            text_output = self._ghci.run(code, verbose=args.verbose)
         except (ghci2py.Ghci2PyError) as exception:
             msg = exception.message
             msg = msg.split('-- <end_pre_call> --')[1]
