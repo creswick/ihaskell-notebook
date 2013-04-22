@@ -34,7 +34,8 @@ import ghci2py
 
 from IPython.core.displaypub import publish_display_data
 from IPython.core.magic import (Magics, magics_class, line_magic,
-                                line_cell_magic, needs_local_scope)
+                                line_cell_magic, cell_magic,
+                                needs_local_scope)
 from IPython.testing.skipdoctest import skip_doctest
 from IPython.core.magic_arguments import (
     argument, magic_arguments, parse_argstring
@@ -113,50 +114,16 @@ class GhciMagics(Magics):
             self.shell.push({output: self._ghci.get(output)})
 
     @skip_doctest
-    @magic_arguments()
-    @argument(
-        '-i', '--input', action='append',
-        help='Names of input variables to be pushed to Ghci. Multiple names '
-             'can be passed, separated by commas with no whitespace.')
-    @argument(
-        '-o', '--output', action='append',
-        help='Names of variables to be pulled from Ghci after executing cell '
-             'body. Multiple names can be passed, separated by commas with no '
-             'whitespace.')
-    @needs_local_scope
-    @argument(
-        'code',
-        nargs='*')
-    @line_cell_magic
+    @cell_magic
     def ghci(self, line, cell=None, local_ns=None):
         '''
         Execute code in Ghci, and pull some of the results back into the
         Python namespace.
         '''
-        args = parse_argstring(self.ghci, line)
-
-        # arguments 'code' in line are prepended to the cell lines
         if cell is None:
             code = ''
-            return_output = True
         else:
             code = cell
-            return_output = False
-
-        code = ' '.join(args.code) + code
-
-        # if there is no local namespace then default to an empty dict
-        if local_ns is None:
-            local_ns = {}
-
-        if args.input:
-            for input in ','.join(args.input).split(','):
-                input = unicode_to_str(input)
-                try:
-                    val = local_ns[input]
-                except KeyError:
-                    val = self.shell.user_ns[input]
-                self._ghci.put(input, val)
 
         pre_call = '''
         -- <end_pre_call> --
@@ -164,7 +131,7 @@ class GhciMagics(Magics):
 
         post_call = '''
         -- <start_post_call> --
-        ''' % locals()
+        '''
 
         code = ' '.join((pre_call, code, post_call))
         try:
@@ -182,17 +149,8 @@ class GhciMagics(Magics):
         if text_output:
             display_data.append((key, {'text/plain': text_output}))
 
-        if args.output:
-            for output in ','.join(args.output).split(','):
-                output = unicode_to_str(output)
-                self.shell.push({output: self._ghci.get(output)})
-
         for source, data in display_data:
             self._publish_display_data(source, data)
-
-        if return_output:
-            ans = self._ghci.get('_')
-            return ans
 
 
 __doc__ = __doc__.format(GHCI_DOC=' '*8 + GhciMagics.ghci.__doc__,
@@ -203,3 +161,8 @@ __doc__ = __doc__.format(GHCI_DOC=' '*8 + GhciMagics.ghci.__doc__,
 def load_ipython_extension(ip):
     """Load the extension in IPython."""
     ip.register_magics(GhciMagics)
+
+
+def unload_ipython_extension(ipython):
+        # If you want your extension to be unloadable, put that logic here.
+        pass
