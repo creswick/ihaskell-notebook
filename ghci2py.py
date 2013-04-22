@@ -19,7 +19,7 @@ GHCI_PROMPT = re.compile('^[^\r\n]*> ', re.MULTILINE)
 #GHCI_PROMPT = re.compile('^Prelude> ', re.MULTILINE)
 
 # The prefix string to remove from ghci results:
-RESULT_PFX = '0d0d0a1b5b3f316c1b3e'.decode('hex')
+RESULT_PFX = '0a1b5b3f316c1b3e'.decode('hex')
 
 class Ghci2Py:
 
@@ -39,19 +39,33 @@ class Ghci2Py:
         if verbose:
             print "sending command '%s'"%cmd
 
-        self.child.sendline(cmd)
+        self.child.sendline(":{")
+        for l in cmd.splitlines():
+            self.child.expect("^.*| ")
+            self.child.sendline(l)
+
+        self.child.expect("^.*| ")
+        self.child.sendline(":}")
         self.child.expect(GHCI_PROMPT)
+
         # remove the cmd string, and the new line:
-        pfx_len = len(RESULT_PFX)
-        raw_str = self.child.before[len(cmd):]
+        raw_str = self.child.before
+
         if verbose:
             print "raw result: '%s'"%toHex(raw_str)
+            print "raw result: '%s'"%raw_str
 
+        raw_str = "\n".join(raw_str.splitlines()[3:])
+        if verbose:
+            print "raw result: '%s'"%toHex(raw_str)
+            print "raw result: '%s'"%raw_str
+
+        pfx_len = len(RESULT_PFX)
         str = raw_str[pfx_len:]
 
         # remove the trailing new line:
-        if len(str) > 0:
-            str = str[:-2]
+        # if len(str) > 0:
+        #     str = str[:-2]
         if verbose:
             print "received result: '%s'"%str
             print "received result: '%s'"%toHex(str)
