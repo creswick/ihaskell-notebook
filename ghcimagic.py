@@ -132,16 +132,10 @@ class GhciMagics(Magics):
         else:
             code = cell
 
-        pre_call = ''
-        post_call = ''
-
-        code = ' '.join((pre_call, code, post_call))
         try:
             text_output = self._ghci.run(code, verbose=args.verbose)
         except (ghci2py.Ghci2PyError) as exception:
             msg = exception.message
-            msg = msg.split('-- <end_pre_call> --')[1]
-            msg = msg.split('-- <start_post_call> --')[0]
             raise GhciMagicError('Ghci could not complete execution: %s' % msg)
 
         key = 'GhciMagic.Ghci'
