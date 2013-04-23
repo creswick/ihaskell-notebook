@@ -21,10 +21,15 @@ GHCI_PROMPT = re.compile('^[^\r\n]*> ', re.MULTILINE)
 # The prefix string to remove from ghci results:
 RESULT_PFX = '0a1b5b3f316c1b3e'.decode('hex')
 
+# Default modules to load:
+modules = ['Text.Pretty.Show']
+
 class Ghci2Py:
 
     def __init__(self):
         self.child = setup_ghci_process()
+        for module in modules:
+            self.send_command(":m + " + module)
 
     def put(self, key, value):
         pass
@@ -35,9 +40,11 @@ class Ghci2Py:
     def run(self, code, verbose=False):
         return self.send_command(code, verbose)
 
-    def send_command(self, cmd, verbose):
+    def send_command(self, cmd, verbose=False):
         if verbose:
-            print "sending command '%s'"%cmd
+            print "---sending command---\n"
+            print cmd
+            print "\n---------------------"
 
         self.child.sendline(":{")
         for l in cmd.splitlines():
