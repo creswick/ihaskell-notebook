@@ -155,10 +155,13 @@ __doc__ = __doc__.format(GHCI_DOC=' '*8 + GhciMagics.ghci.__doc__,
 
 
 def load_ipython_extension(ip):
-    """Load the extension in IPython."""
+    """Load the extension in IPython and overwrite the normal IPython running
+    instance's `run_cell` method with one that invokes the ghci cell magic."""
     ip.register_magics(GhciMagics)
 
+    def new_run_cell(self, raw_cell, **kwds):
+        self.run_cell_magic('ghci', '', raw_cell)  # ignore **kwds
 
-def unload_ipython_extension(ipython):
-        # If you want your extension to be unloadable, put that logic here.
-        pass
+    from IPython.core.interactiveshell import InteractiveShell
+    func_type = type(InteractiveShell.run_cell)
+    ip.run_cell = func_type(new_run_cell, ip, InteractiveShell)
