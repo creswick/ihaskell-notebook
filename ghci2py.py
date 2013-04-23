@@ -45,7 +45,20 @@ class Ghci2Py:
         pass
 
     def run(self, code, verbose=False):
-        return self.send_command(code, verbose)
+        results = []
+        statements = []
+        for line in code.splitlines():
+            if line.startswith("import"):
+                res = self.send_command(line, verbose)
+                if res != "":
+                    results.append(res)
+            else:
+                statements.append(line)
+        results.append(self.send_command("\n".join(statements)))
+
+        if results == []:
+            return []
+        return "\n".join(results)        
 #        return self.send_command(show_html_fn, verbose)
 
     def send_command(self, cmd, verbose=False):
@@ -108,3 +121,7 @@ def toHex(s):
 #convert hex repr to string
 def toStr(s):
     return s.decode('hex')
+
+
+class Ghci2PyError:
+    pass
