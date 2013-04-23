@@ -21,10 +21,22 @@ GHCI_PROMPT = re.compile('^[^\r\n]*> ', re.MULTILINE)
 # The prefix string to remove from ghci results:
 RESULT_PFX = '0a1b5b3f316c1b3e'.decode('hex')
 
+# Default modules to load:
+modules = ['Text.Show.Pretty']
+
+show_html_fn = """
+let ghci2pyshowHtml v = case parseValue $ show v of
+                         Nothing -> "<pre>" ++ (show v) ++ "</pre>"
+                         Just str -> valToHtmlPage (HtmlOpts "" 40) str
+in ghci2pyshowHtml it
+"""
+
 class Ghci2Py:
 
     def __init__(self):
         self.child = setup_ghci_process()
+        for module in modules:
+            self.send_command("import " + module)
 
     def put(self, key, value):
         pass
@@ -34,10 +46,13 @@ class Ghci2Py:
 
     def run(self, code, verbose=False):
         return self.send_command(code, verbose)
+#        return self.send_command(show_html_fn, verbose)
 
-    def send_command(self, cmd, verbose):
+    def send_command(self, cmd, verbose=False):
         if verbose:
-            print "sending command '%s'"%cmd
+            print "---sending command---\n"
+            print cmd
+            print "\n---------------------"
 
         self.child.sendline(":{")
         for l in cmd.splitlines():
