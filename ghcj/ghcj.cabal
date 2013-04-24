@@ -20,8 +20,10 @@ Library
    Build-depends:    base,
                      ghc,
                      ghc-paths,
-                     json,
-                     mtl
+                     aeson,
+                     mtl,
+                     bytestring,
+                     base64-bytestring
 
    exposed-modules:  GHCJ
 
@@ -33,8 +35,8 @@ Executable ghcj
 
    Build-depends:    ghcj,
                      base,
-                     json,
-                     mtl
+                     mtl,
+                     bytestring
 
    ghc-options:      -Wall
 
@@ -46,6 +48,13 @@ Executable test-ghcj
       Buildable:              False
 
    Build-depends:    ghcj,
-                     base
+                     base,
+                     HUnit,
+                     test-framework,
+--                     test-framework-quickcheck2,
+                     test-framework-hunit,
+                     aeson,
+                     bytestring
+
 
    ghc-options:      -Wall

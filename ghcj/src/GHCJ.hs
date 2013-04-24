@@ -1,64 +1,33 @@
+{-# LANGUAGE DeriveDataTypeable #-}
 module GHCJ
 where
 
 import Control.Monad.State
 
-import Text.JSON
+import qualified Data.ByteString.Lazy as BL (fromChunks)
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Base64 as B64
+import qualified Data.ByteString.Char8 as C8
 
--- | The JSON string for the output data. (An Either Error Success value)
-data_key_str :: String
-data_key_str = "result"
+-- import Text.JSON
 
--- | The name of the cell id string in json input/output
-id_key_str :: String
-id_key_str = "id"
+import Data.Aeson.Generic
+import qualified Data.Aeson.Generic as AE
 
--- | The name of the source key in the json input/output
-src_key_str :: String
-src_key_str = "source"
+import Data.Typeable
+import Data.Data
 
-data Input =
-    Input { inputCellNo :: Int
-          , inputSource :: String
-          } deriving (Show)
+data Input = Input { inputCellNo :: Int
+                   , inputSource :: String
+                   } deriving (Eq, Show, Data, Typeable)
 
-data (JSON j, JSON i) => Output j i =
-    Output { outputCellNo :: Int
-           , outputData   :: Either j i
-           -- ^ Left to indicate an error, Right indicates success.
-           } deriving (Show)
-
-instance (JSON i, JSON j) => JSON (Output j i) where
-    readJSON (JSObject jso) =
-        let table = fromJSObject jso
-        in case (lookup id_key_str table, lookup data_key_str table) of
-             (Just cn, Just outData) -> do
-               cId <- readJSON cn
-               dat <- readJSON outData
-               return Output { outputCellNo = cId
-                             , outputData   = dat }
-             _                   -> Error $ show jso
-    readJSON input            = Error $ show input
-
-    showJSON (Output cellNo dat) = JSObject $ toJSObject [ (id_key_str, showJSON cellNo)
-                                                         , (data_key_str, showJSON dat)]
-
-instance JSON Input where
-    -- readJSON  :: JSValue -> Result Input
-    readJSON (JSObject jso) =
-        let table = fromJSObject jso
-        in case (lookup id_key_str table, lookup src_key_str table) of
-             (Just cn, Just src) -> do
-               cId <- readJSON cn
-               code <- readJSON src
-               return Input { inputCellNo = cId
-                            , inputSource = code }
-             _                   -> Error $ show jso
-    readJSON input            = Error $ show input
-
-    -- showJSON :: Input -> JSValue
-    showJSON (Input cellNo source) = JSObject $ toJSObject [ (id_key_str, showJSON cellNo)
-                                                           , (src_key_str, showJSON source)]
+data Output = ParseError String
+            | CompileError String
+            | CompileWarning String
+            | Output { outputCellNo :: Int
+                     , outputData   :: String
+                     }
+              deriving (Eq, Show, Data, Typeable)
 
 -- | Data type to hold the GHC API state, for now, it's mostly a placeholder.
 data EvalState = EState { modules :: [Input] -- ^ A list of the successfull builds
@@ -67,5 +36,36 @@ data EvalState = EState { modules :: [Input] -- ^ A list of the successfull buil
 initialState :: EvalState
 initialState = EState { modules = [] }
 
-evaluate :: (JSON i, JSON j) => Input -> State EvalState (Output j i)
-evaluate = undefined
+evalLine :: String -> State EvalState Output
+evalLine encLine = case B64.decode $ C8.pack encLine of
+                     Left err -> return $ ParseError ("B64 Decoding Failed: "++err)
+                     Right json -> evalJsonLine (BL.fromChunks [json])
+
+-- evalJsonLine :: ByteString -> State EvalState Output
+evalJsonLine jsonLine = case AE.decode jsonLine of
+                          Nothing    -> return $ ParseError 
+                                           ("JSON Decode falied." ++ (show jsonLine))
+                          Just input -> evaluate input
+                                                           
+
+evaluate :: Input -> State EvalState Output
+evaluate (Input cId code) = return Output { outputCellNo = cId
+                                          , outputData = "Done! (but, didn't do anything)"
+                                          }
+
+-- evalLine encodedLn = return $ let eJson = B64.decode $ C8.pack encodedLn
+--                               in case eJson of
+--                                 Left   err -> ParseError 
+--                                 Right json -> 
+--                                          let decoded :: Result Input
+--                                              decoded = decode $ C8.unpack json
+--                                          in case decoded of
+--                                               Error str           ->
+--                                                   ParseError ("JSON Decode falied: "++str)
+--                                               Ok (Input cId code) ->
+--                                                   case decode code of
+--                                                     Error eStr -> ParseError $ "Code: "++code
+--                                                     Ok    cStr -> Output cId cStr
+
+-- process :: Input -> State EvalState (Output String)
+-- process (Input cId code) = return $ Output cId "done! (but I didn't do anything)" 
