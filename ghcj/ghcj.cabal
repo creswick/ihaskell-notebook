@@ -19,7 +19,11 @@ Library
 
    Build-depends:    base,
                      ghc,
-                     ghc-paths
+                     ghc-paths,
+                     json,
+                     mtl
+
+   exposed-modules:  GHCJ
 
    ghc-options:      -Wall
 
@@ -28,7 +32,9 @@ Executable ghcj
    hs-source-dirs:   appsrc
 
    Build-depends:    ghcj,
-                     base
+                     base,
+                     json,
+                     mtl
 
    ghc-options:      -Wall
 
