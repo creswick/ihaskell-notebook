@@ -17,7 +17,9 @@ Flag tests
 Library
    hs-source-dirs:   src
 
-   Build-depends:    base       >= 4       && < 6
+   Build-depends:    base,
+                     ghc,
+                     ghc-paths
 
    ghc-options:      -Wall
 
@@ -26,7 +28,7 @@ Executable ghcj
    hs-source-dirs:   appsrc
 
    Build-depends:    ghcj,
-                     base       >= 4       && < 6
+                     base
 
    ghc-options:      -Wall
 
@@ -38,6 +40,6 @@ Executable test-ghcj
       Buildable:              False
 
    Build-depends:    ghcj,
-                     base       >= 4       && < 6
+                     base
 
    ghc-options:      -Wall
