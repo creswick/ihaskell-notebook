@@ -22,7 +22,6 @@ evalJsonLine jsonLine = case AE.decode jsonLine of
                           Nothing    -> return $ ParseError 
                                            ("JSON Decode falied." ++ (show jsonLine))
                           Just input -> evaluate input
-                                                           
 
 evaluate :: Input -> StateT EvalState Ghc Output
 evaluate (Input cId stmt) = evalStmt stmt

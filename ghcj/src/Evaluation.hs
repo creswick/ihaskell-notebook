@@ -16,12 +16,14 @@ import InteractiveEval (RunResult(..))
 
 import Types
 
-mkTarget :: String -> String -> IO Target
-mkTarget name code = do now <- getCurrentTime
-                        return Target { targetId = TargetModule $ mkModuleName name
-                                      , targetAllowObjCode = False
-                                      , targetContents = Just (stringToStringBuffer code, now) 
-                                      }
+mkTargetMod :: String -> String -> IO (ModuleName, Target)
+mkTargetMod name code = do now <- getCurrentTime
+                           let modName = mkModuleName name
+                           return ( modName
+                                  , Target { targetId = TargetModule modName
+                                           , targetAllowObjCode = False
+                                           , targetContents = Just (stringToStringBuffer code, now)
+                                           })
 
 mkTargetFile :: FilePath -> IO Target
 mkTargetFile path = do return Target { targetId = TargetFile path Nothing
@@ -29,42 +31,56 @@ mkTargetFile path = do return Target { targetId = TargetFile path Nothing
                                      , targetContents = Nothing
                                      }
 
-tmpFileSrc = "temp_file = \"the_file\""
+mkCustomPrelude :: FilePath -> IO (ModuleName, Target)
+mkCustomPrelude tmpFile = do print ourPreludeSrc
+                             mkTargetMod "OurPrelude" ourPreludeSrc
 
-ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ tmpFileSrc
+    where ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ tmpFileSrc
+          tmpFileSrc = "temp_file = "++show tmpFile
 
-initSession :: IO Session
-initSession = runGhc (Just libdir) $ do 
-                dflags <- getSessionDynFlags 
+customPrintFnStr :: String
+customPrintFnStr = "Printer.ourPrint"
+
+mkModules :: FilePath -> IO [(ModuleName, Target)]
+mkModules tmpFile = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile
+                       printer    <- mkTargetFile "Printer.hs"
+                       let printerName = mkModuleName "Printer"
+                       return [ (preludeName, ourPrelude)
+                              , (printerName, printer)]
+
+initSession :: FilePath -> IO Session
+initSession tmpFile = runGhc (Just libdir) $ do
+                dflags <- getSessionDynFlags
                 setSessionDynFlags dflags { ghcLink = LinkInMemory
-                                          , hscTarget = HscInterpreted 
+                                          , hscTarget = HscInterpreted
                                           -- | Interactive print
                                           -- doesn't seem to work, but
                                           -- parseName (below) does
-                                          , interactivePrint = Just "OurPrelude.ourPrint" }
+                                          , interactivePrint = Just customPrintFnStr }
 
-                ourTarget <- MonadUtils.liftIO $ mkTarget "OurPrelude" ourPreludeSrc
-                addTarget ourTarget
-
-                printTarget <- MonadUtils.liftIO $ mkTargetFile "Printer.hs"
-                addTarget printTarget
+                modules <- MonadUtils.liftIO $ mkModules tmpFile
+                mapM_ (addTarget . snd) modules
 
                 sFlag <- load LoadAllTargets
-                setContext [IIModule $ mkModuleName "OurPrelude", IIModule $ mkModuleName "Printer"]
+                case sFlag of
+                  Failed    -> error "Could not initialize session."
+                  Succeeded -> do
+                             setContext $ map (IIModule . fst)  modules
+                             -- setContext [ IIModule $ mkModuleName "OurPrelude"
+                             --            , IIModule $ mkModuleName "Printer"]
 
-                (name:_) <- parseName "Printer.ourPrint"
-                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
-                                      in he { hsc_IC = new_ic })
-
-                -- reifyGhc takes a function of (Session -> IO a) and
-                -- returns Ghc a.  we use it here to get and return
-                -- the Session:
-                reifyGhc return
+                             (name:_) <- parseName customPrintFnStr
+                             modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                                                   in he { hsc_IC = new_ic })
+                             -- reifyGhc takes a function of (Session -> IO a) and
+                             -- returns Ghc a.  we use it here to get and return
+                             -- the Session:
+                             reifyGhc return
 
 
 addModule :: String -> Ghc ()
 addModule code = let target = buildTarget code
-                 in do 
+                 in do
                    addTarget target
                    sFlag <- load LoadAllTargets
                    setContext [IIModule $ mkModuleName "TestModule1"]
@@ -72,18 +88,18 @@ addModule code = let target = buildTarget code
                    case sFlag of
                      Failed    -> error "Compliation Failed"
                      Succeeded -> return () -- no output when loading modules.
-                    
+
 buildTarget :: String -> Target
 buildTarget = undefined
 
 -- evalModule :: String -> State EvalState Output
--- evalModule code = do 
+-- evalModule code = do
 
 evalStmt :: String -> StateT EvalState Ghc Output
-evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) handler
+evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
                    return Output { outputCellNo = 0
                                  , outputData = runResultToStr runResult }
-    where handler e = return $ RunException e
+    where errHandler e = return $ RunException e
 
 
 -- showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
@@ -100,7 +116,7 @@ evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) han
 --                        addTarget target
 --                        sFlag <- load LoadAllTargets
 --                        setContext [IIModule $ mkModuleName "TestModule1"]
-                       
+--
 --                        case sFlag of
 --                          Failed    -> error "Compliation Failed"
 --                          Succeeded -> do result <- runStmt stmt RunToCompletion

@@ -24,7 +24,8 @@ Library
                      mtl,
                      bytestring,
                      base64-bytestring,
-                     time
+                     time,
+                     temporary
 
    exposed-modules:  GHCJ, Types, Evaluation
 
@@ -38,7 +39,8 @@ Executable ghcj
                      ghc,
                      base,
                      mtl,
-                     bytestring
+                     bytestring,
+                     temporary
 
    ghc-options:      -Wall
 
