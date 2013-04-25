@@ -8,9 +8,10 @@ import GHC.Paths
 import DynFlags
 import StringBuffer
 import Data.Time.Clock
--- import Outputable
+import Outputable
 -- import Finder
 import MonadUtils (liftIO)
+import InteractiveEval (RunResult(..))
 
 import Types
 
@@ -55,11 +56,15 @@ buildTarget = undefined
 -- evalModule code = do 
 
 evalStmt :: String -> StateT EvalState Ghc Output
-evalStmt stmt = do runResult <- lift $ runStmt stmt RunToCompletion
+evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) handler
                    return Output { outputCellNo = 0
                                  , outputData = runResultToStr runResult }
+    where handler e = return $ RunException e
 
 
+-- showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
+--                      in runSDoc (ppr name) ctx
+-- printOut flags name = print $ showOut flags name
 
 -- eval :: HscEnv -> Target -> String -> IO (RunResult, HscEnv)
 -- eval session target stmt = defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
@@ -79,6 +84,6 @@ evalStmt stmt = do runResult <- lift $ runStmt stmt RunToCompletion
 --                                          return (result, newSession)
 
 runResultToStr :: RunResult -> String
-runResultToStr RunOk {}        = "RunOk"
-runResultToStr RunException {} = "RunException"
+runResultToStr (RunOk ns)      = "RunOk " ++ (show $ length ns)
+runResultToStr (RunException e) = "RunException " ++ show e
 runResultToStr RunBreak {}     = "RunBreak"
