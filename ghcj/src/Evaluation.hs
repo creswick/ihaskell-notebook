@@ -2,6 +2,8 @@ module Evaluation where
 
 import Control.Monad.State
 import System.IO (writeFile)
+import System.Environment (getEnvironment)
+import Data.List (intercalate)
 
 import GHC
 import GhcMonad
@@ -18,11 +20,15 @@ import InteractiveEval (RunResult(..))
 import Types
 
 runtimeSrcDir :: FilePath
-runtimeSrcDir = "./runtimesrc"
+runtimeSrcDir = "runtimesrc"
+
+-- | TODO not cross-platform
+mkPath :: [String] -> FilePath
+mkPath xs = intercalate "/" xs
 
 mkTargetMod :: FilePath -> String -> String -> IO (ModuleName, Target)
 mkTargetMod tmpDir name code = do 
-  let fName = tmpDir ++ "/" ++ name ++ ".hs" -- TODO not cross-platform
+  let fName = mkPath [tmpDir, name ++ ".hs"]
   writeFile fName "-- ghc needs a file to exist with this name."
   now <- getCurrentTime
   let modName = mkModuleName name
@@ -48,8 +54,12 @@ customPrintFnStr :: String
 customPrintFnStr = "Printer.ourPrint"
 
 mkModules :: FilePath -> FilePath -> IO [(ModuleName, Target)]
-mkModules tmpFile tmpDir = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
-                              printer                   <- mkTargetFile (runtimeSrcDir ++ "/Printer.hs")
+mkModules tmpFile tmpDir = do env <- getEnvironment
+                              let rootDir = case lookup "IHNB_ROOT" env of
+                                              Nothing   -> "."
+                                              Just path -> path
+                              (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
+                              printer                   <- mkTargetFile (mkPath [rootDir, runtimeSrcDir, "Printer.hs"])
                               let printerName = mkModuleName "Printer"
                               return [ (preludeName, ourPrelude)
                                      , (printerName, printer)]
