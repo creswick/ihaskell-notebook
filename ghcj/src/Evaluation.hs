@@ -94,15 +94,15 @@ buildTarget = undefined
 -- evalModule :: String -> State EvalState Output
 -- evalModule code = do
 
-evalStmt :: String -> StateT EvalState Ghc Output
-evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
-                   case runResult of
-                     RunBreak {}      -> return $ CompileError "RunBreak"
-                     (RunException e) -> return (CompileError $ show e)
-                     (RunOk _)        -> do tmpFile <- gets estateTmpFile
-                                            itVal <- lift $ MonadUtils.liftIO $ getItVal tmpFile
-                                            return Output { outputCellNo = 0
-                                                          , outputData = itVal }
+evalStmt :: Int -> String -> StateT EvalState Ghc Output
+evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
+                       case runResult of
+                         RunBreak {}      -> return $ CompileError "RunBreak"
+                         (RunException e) -> return (CompileError $ show e)
+                         (RunOk _)        -> do tmpFile <- gets estateTmpFile
+                                                itVal <- lift $ MonadUtils.liftIO $ getItVal tmpFile
+                                                return Output { outputCellNo = cId
+                                                              , outputData = itVal }
     where errHandler e = return $ RunException e
 
 -- | Get the value of 'it' from the temp file.

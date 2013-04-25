@@ -24,4 +24,4 @@ evalJsonLine jsonLine = case AE.decode jsonLine of
                           Just input -> evaluate input
 
 evaluate :: Input -> StateT EvalState Ghc Output
-evaluate (Input cId stmt) = evalStmt stmt
+evaluate (Input cId stmt) = evalStmt cId stmt

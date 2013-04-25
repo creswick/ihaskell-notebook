@@ -40,7 +40,8 @@ Executable ghcj
                      base,
                      mtl,
                      bytestring,
-                     temporary
+                     temporary,
+                     aeson
 
    ghc-options:      -Wall
 

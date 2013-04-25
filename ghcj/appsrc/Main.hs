@@ -11,6 +11,8 @@ import GHC
 import DynFlags
 import GhcMonad (unGhc)
 
+import qualified Data.Aeson.Generic as AE
+
 import GHCJ
 import Evaluation
 import Types
@@ -29,5 +31,5 @@ main = do withSystemTempDirectory "iHaskell.shared" $ \tdir -> do
             return ()
     where loop = do input <- lift $ liftIO getLine
                     result <- evalLine input
-                    lift $ liftIO $ print result
+                    lift $ liftIO $ print $ AE.encode result
                     loop
