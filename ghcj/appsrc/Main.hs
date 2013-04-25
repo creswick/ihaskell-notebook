@@ -5,7 +5,6 @@ import Control.Monad.State (runStateT)
 import Control.Monad.Trans (lift)
 import MonadUtils
 
-import Exception
 import GHC
 import DynFlags
 import GhcMonad (unGhc)
@@ -18,7 +17,7 @@ fout = defaultFlushOut
 
 main :: IO ()
 main = do session <- initSession
-          defaultErrorHandler defaultFatalMessager fout $ unGhc (runStateT loop initialState) session
+          _ <- defaultErrorHandler defaultFatalMessager fout $ unGhc (runStateT loop initialState) session
           return ()
     where loop = do input <- lift $ liftIO getLine
                     -- catch exceptions:

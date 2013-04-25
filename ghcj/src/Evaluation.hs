@@ -6,6 +6,7 @@ import GHC
 import GhcMonad
 import GHC.Paths
 import DynFlags
+import HscTypes
 import StringBuffer
 import Data.Time.Clock
 import Outputable
@@ -22,15 +23,27 @@ mkTarget code = do now <- getCurrentTime
                                  , targetContents = Just (stringToStringBuffer code, now) 
                                  }
 
+ourPrintSrc = "ourPrint x = print (\"hi \" ++ (show x))"
+
+ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ ourPrintSrc
+
 initSession :: IO Session
 initSession = runGhc (Just libdir) $ do 
                 dflags <- getSessionDynFlags 
                 setSessionDynFlags dflags { ghcLink = LinkInMemory
-                                          , hscTarget = HscInterpreted }
-                ourTarget <- MonadUtils.liftIO $ mkTarget "module OurPrelude where\nimport Prelude"
+                                          , hscTarget = HscInterpreted 
+                                          -- | Interactive print doesn't seem to work..
+                                          , interactivePrint = Just "OurPrelude.ourPrint" }
+
+
+                ourTarget <- MonadUtils.liftIO $ mkTarget ourPreludeSrc
                 addTarget ourTarget
                 sFlag <- load LoadAllTargets
                 setContext [IIModule $ mkModuleName "OurPrelude"]
+
+                (name:_) <- parseName "OurPrelude.ourPrint"
+                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                                      in he { hsc_IC = new_ic })
 
                 -- reifyGhc takes a function of (Session -> IO a) and
                 -- returns Ghc a.  we use it here to get and return
