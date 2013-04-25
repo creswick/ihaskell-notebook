@@ -16,32 +16,43 @@ import InteractiveEval (RunResult(..))
 
 import Types
 
-mkTarget :: String -> IO Target
-mkTarget code = do now <- getCurrentTime
-                   return Target { targetId = TargetModule $ mkModuleName "OurPrelude"
-                                 , targetAllowObjCode = False
-                                 , targetContents = Just (stringToStringBuffer code, now) 
-                                 }
+mkTarget :: String -> String -> IO Target
+mkTarget name code = do now <- getCurrentTime
+                        return Target { targetId = TargetModule $ mkModuleName name
+                                      , targetAllowObjCode = False
+                                      , targetContents = Just (stringToStringBuffer code, now) 
+                                      }
 
-ourPrintSrc = "ourPrint x = print (\"hi \" ++ (show x))"
+mkTargetFile :: FilePath -> IO Target
+mkTargetFile path = do return Target { targetId = TargetFile path Nothing
+                                     , targetAllowObjCode = False
+                                     , targetContents = Nothing
+                                     }
 
-ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ ourPrintSrc
+tmpFileSrc = "temp_file = \"the_file\""
+
+ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ tmpFileSrc
 
 initSession :: IO Session
 initSession = runGhc (Just libdir) $ do 
                 dflags <- getSessionDynFlags 
                 setSessionDynFlags dflags { ghcLink = LinkInMemory
                                           , hscTarget = HscInterpreted 
-                                          -- | Interactive print doesn't seem to work..
+                                          -- | Interactive print
+                                          -- doesn't seem to work, but
+                                          -- parseName (below) does
                                           , interactivePrint = Just "OurPrelude.ourPrint" }
 
-
-                ourTarget <- MonadUtils.liftIO $ mkTarget ourPreludeSrc
+                ourTarget <- MonadUtils.liftIO $ mkTarget "OurPrelude" ourPreludeSrc
                 addTarget ourTarget
-                sFlag <- load LoadAllTargets
-                setContext [IIModule $ mkModuleName "OurPrelude"]
 
-                (name:_) <- parseName "OurPrelude.ourPrint"
+                printTarget <- MonadUtils.liftIO $ mkTargetFile "Printer.hs"
+                addTarget printTarget
+
+                sFlag <- load LoadAllTargets
+                setContext [IIModule $ mkModuleName "OurPrelude", IIModule $ mkModuleName "Printer"]
+
+                (name:_) <- parseName "Printer.ourPrint"
                 modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                       in he { hsc_IC = new_ic })
 
