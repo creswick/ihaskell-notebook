@@ -59,7 +59,7 @@ mkModules tmpFile tmpDir = do env <- getEnvironment
                                               Nothing   -> "."
                                               Just path -> path
                               (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
-                              printer                   <- mkTargetFile (mkPath [rootDir, runtimeSrcDir, "Printer.hs"])
+                              printer                   <- mkTargetFile (mkPath [rootDir, "ghcj", runtimeSrcDir, "Printer.hs"])
                               let printerName = mkModuleName "Printer"
                               return [ (preludeName, ourPrelude)
                                      , (printerName, printer)]
