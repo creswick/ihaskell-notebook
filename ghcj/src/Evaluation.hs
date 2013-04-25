@@ -16,6 +16,9 @@ import InteractiveEval (RunResult(..))
 
 import Types
 
+runtimeSrcDir :: FilePath
+runtimeSrcDir = "./runtimesrc"
+
 mkTargetMod :: String -> String -> IO (ModuleName, Target)
 mkTargetMod name code = do now <- getCurrentTime
                            let modName = mkModuleName name
@@ -42,20 +45,28 @@ customPrintFnStr = "Printer.ourPrint"
 
 mkModules :: FilePath -> IO [(ModuleName, Target)]
 mkModules tmpFile = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile
-                       printer                   <- mkTargetFile "Printer.hs"
+                       printer                   <- mkTargetFile (runtimeSrcDir ++ "/Printer.hs")
                        let printerName = mkModuleName "Printer"
                        return [ (preludeName, ourPrelude)
                               , (printerName, printer)]
 
-initSession :: FilePath -> IO Session
-initSession tmpFile = runGhc (Just libdir) $ do
+initSession :: FilePath -> FilePath -> IO Session
+initSession tmpFile tmpDir = runGhc (Just libdir) $ do
                 dflags <- getSessionDynFlags
                 setSessionDynFlags dflags { ghcLink = LinkInMemory
                                           , hscTarget = HscInterpreted
+                                          , importPaths = tmpDir:runtimeSrcDir:(importPaths dflags)
                                           -- | Interactive print
                                           -- doesn't seem to work, but
                                           -- parseName (below) does
                                           , interactivePrint = Just customPrintFnStr }
+                nflags <- getSessionDynFlags
+                MonadUtils.liftIO $ do putStrLn "Import paths"
+                                       print $ importPaths nflags
+                                       putStrLn "Include paths"
+                                       print $ includePaths nflags
+                                       putStrLn "libary paths"
+                                       print $ libraryPaths nflags
 
                 modules <- MonadUtils.liftIO $ mkModules tmpFile
                 mapM_ (addTarget . snd) modules
@@ -76,7 +87,6 @@ initSession tmpFile = runGhc (Just libdir) $ do
                              -- the Session:
                              reifyGhc return
 
-
 addModule :: String -> Ghc ()
 addModule code = let target = buildTarget code
                  in do
@@ -90,9 +100,6 @@ addModule code = let target = buildTarget code
 
 buildTarget :: String -> Target
 buildTarget = undefined
-
--- evalModule :: String -> State EvalState Output
--- evalModule code = do
 
 evalStmt :: Int -> String -> StateT EvalState Ghc Output
 evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
@@ -118,19 +125,5 @@ runResultToStr RunBreak {}     = "RunBreak"
 --                      in runSDoc (ppr name) ctx
 -- printOut flags name = print $ showOut flags name
 
--- eval :: HscEnv -> Target -> String -> IO (RunResult, HscEnv)
--- eval session target stmt = defaultErrorHandler defaultFatalMessager defaultFlushOut $ do
---                      runGhc (Just libdir) $ do
---                        setSession session
---                        dflags <- getSessionDynFlags 
---                        setSessionDynFlags dflags { ghcLink = LinkInMemory
---                                                  , hscTarget = HscInterpreted }
---                        addTarget target
---                        sFlag <- load LoadAllTargets
---                        setContext [IIModule $ mkModuleName "TestModule1"]
---
---                        case sFlag of
---                          Failed    -> error "Compliation Failed"
---                          Succeeded -> do result <- runStmt stmt RunToCompletion
---                                          newSession <- getSession
---                                          return (result, newSession)
+-- evalModule :: Int -> String -> State EvalState Output
+-- evalModule cId code = do 
