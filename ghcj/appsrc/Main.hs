@@ -24,7 +24,7 @@ main :: IO ()
 main = do withSystemTempDirectory "iHaskell.shared" $ \tdir -> do
             (tmpFile, hdl) <- openTempFile tdir "iHaskell.vals"
             hClose hdl -- close handle, we don't need it yet.
-            session <- initSession tmpFile
+            session <- initSession tmpFile tdir
             let istate = initialState tmpFile tdir
             _ <- defaultErrorHandler defaultFatalMessager fout $
                  unGhc (runStateT loop istate) session
