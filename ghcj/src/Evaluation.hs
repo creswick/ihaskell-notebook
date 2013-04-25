@@ -32,18 +32,17 @@ mkTargetFile path = do return Target { targetId = TargetFile path Nothing
                                      }
 
 mkCustomPrelude :: FilePath -> IO (ModuleName, Target)
-mkCustomPrelude tmpFile = do print ourPreludeSrc
-                             mkTargetMod "OurPrelude" ourPreludeSrc
-
-    where ourPreludeSrc = "module OurPrelude where\nimport Prelude\n" ++ tmpFileSrc
-          tmpFileSrc = "temp_file = "++show tmpFile
+mkCustomPrelude tmpFile = mkTargetMod "OurPrelude" ourPreludeSrc
+    where ourPreludeSrc = "module OurPrelude where\n"++
+                          "import Prelude\n" ++
+                          "temp_file = "++show tmpFile
 
 customPrintFnStr :: String
 customPrintFnStr = "Printer.ourPrint"
 
 mkModules :: FilePath -> IO [(ModuleName, Target)]
 mkModules tmpFile = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile
-                       printer    <- mkTargetFile "Printer.hs"
+                       printer                   <- mkTargetFile "Printer.hs"
                        let printerName = mkModuleName "Printer"
                        return [ (preludeName, ourPrelude)
                               , (printerName, printer)]
@@ -97,10 +96,23 @@ buildTarget = undefined
 
 evalStmt :: String -> StateT EvalState Ghc Output
 evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
-                   return Output { outputCellNo = 0
-                                 , outputData = runResultToStr runResult }
+                   case runResult of
+                     RunBreak {}      -> return $ CompileError "RunBreak"
+                     (RunException e) -> return (CompileError $ show e)
+                     (RunOk _)        -> do tmpFile <- gets estateTmpFile
+                                            itVal <- lift $ MonadUtils.liftIO $ getItVal tmpFile
+                                            return Output { outputCellNo = 0
+                                                          , outputData = itVal }
     where errHandler e = return $ RunException e
 
+-- | Get the value of 'it' from the temp file.
+getItVal :: FilePath -> IO String
+getItVal path = readFile path
+
+runResultToStr :: RunResult -> String
+runResultToStr (RunOk ns)      = "RunOk " ++ (show $ length ns)
+runResultToStr (RunException e) = "RunException " ++ show e
+runResultToStr RunBreak {}     = "RunBreak"
 
 -- showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
 --                      in runSDoc (ppr name) ctx
@@ -122,8 +134,3 @@ evalStmt stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) err
 --                          Succeeded -> do result <- runStmt stmt RunToCompletion
 --                                          newSession <- getSession
 --                                          return (result, newSession)
-
-runResultToStr :: RunResult -> String
-runResultToStr (RunOk ns)      = "RunOk " ++ (show $ length ns)
-runResultToStr (RunException e) = "RunException " ++ show e
-runResultToStr RunBreak {}     = "RunBreak"
