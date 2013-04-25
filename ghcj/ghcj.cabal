@@ -40,6 +40,7 @@ Executable ghcj
                      base,
                      mtl,
                      bytestring,
+                     base64-bytestring,
                      temporary,
                      aeson
 

@@ -12,6 +12,10 @@ import DynFlags
 import GhcMonad (unGhc)
 
 import qualified Data.Aeson.Generic as AE
+import qualified Data.ByteString as B
+import qualified Data.ByteString.Lazy as BL (toChunks, ByteString)
+import qualified Data.ByteString.Base64 as B64
+
 
 import GHCJ
 import Evaluation
@@ -31,5 +35,8 @@ main = do withSystemTempDirectory "iHaskell.shared" $ \tdir -> do
             return ()
     where loop = do input <- lift $ liftIO getLine
                     result <- evalLine input
-                    lift $ liftIO $ print $ AE.encode result
+                    lift $ liftIO $ print $ B64.encode $ toStrict $ AE.encode result
                     loop
+
+toStrict :: BL.ByteString -> B.ByteString
+toStrict = B.concat . BL.toChunks
