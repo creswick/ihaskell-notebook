@@ -23,9 +23,10 @@ Library
                      aeson,
                      mtl,
                      bytestring,
-                     base64-bytestring
+                     base64-bytestring,
+                     time
 
-   exposed-modules:  GHCJ
+   exposed-modules:  GHCJ, Types, Evaluation
 
    ghc-options:      -Wall
 
@@ -34,6 +35,7 @@ Executable ghcj
    hs-source-dirs:   appsrc
 
    Build-depends:    ghcj,
+                     ghc,
                      base,
                      mtl,
                      bytestring
