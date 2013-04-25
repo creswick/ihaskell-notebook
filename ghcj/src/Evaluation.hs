@@ -93,6 +93,7 @@ evalModule cId code = do
   
   -- do a bunch of work in the ghc monad:
   lift $ do (mName, target) <- MonadUtils.liftIO $ mkTargetMod tmpDir moduleName fullModule
+            removeTarget $ targetId target
             addTarget target
 
             sFlag <- load LoadAllTargets -- throws SourceError
@@ -139,5 +140,3 @@ runResultToStr RunBreak {}     = "RunBreak"
 showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
                      in runSDoc (ppr name) ctx
 printOut flags name = print $ showOut flags name
-
--- lifter x = lift $ MonadUtils.liftIO x
