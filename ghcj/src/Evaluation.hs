@@ -1,6 +1,7 @@
 module Evaluation where
 
 import Control.Monad.State
+import System.IO (writeFile)
 
 import GHC
 import GhcMonad
@@ -19,14 +20,17 @@ import Types
 runtimeSrcDir :: FilePath
 runtimeSrcDir = "./runtimesrc"
 
-mkTargetMod :: String -> String -> IO (ModuleName, Target)
-mkTargetMod name code = do now <- getCurrentTime
-                           let modName = mkModuleName name
-                           return ( modName
-                                  , Target { targetId = TargetModule modName
-                                           , targetAllowObjCode = False
-                                           , targetContents = Just (stringToStringBuffer code, now)
-                                           })
+mkTargetMod :: FilePath -> String -> String -> IO (ModuleName, Target)
+mkTargetMod tmpDir name code = do 
+  let fName = tmpDir ++ "/" ++ name ++ ".hs" -- TODO not cross-platform
+  writeFile fName "-- ghc needs a file to exist with this name."
+  now <- getCurrentTime
+  let modName = mkModuleName name
+  return ( modName
+         , Target { targetId = TargetModule modName
+                  , targetAllowObjCode = False
+                  , targetContents = Just (stringToStringBuffer code, now)
+                  })
 
 mkTargetFile :: FilePath -> IO Target
 mkTargetFile path = do return Target { targetId = TargetFile path Nothing
@@ -34,8 +38,8 @@ mkTargetFile path = do return Target { targetId = TargetFile path Nothing
                                      , targetContents = Nothing
                                      }
 
-mkCustomPrelude :: FilePath -> IO (ModuleName, Target)
-mkCustomPrelude tmpFile = mkTargetMod "OurPrelude" ourPreludeSrc
+mkCustomPrelude :: FilePath -> FilePath -> IO (ModuleName, Target)
+mkCustomPrelude tmpFile tmpDir = mkTargetMod tmpDir "OurPrelude" ourPreludeSrc
     where ourPreludeSrc = "module OurPrelude where\n"++
                           "import Prelude\n" ++
                           "temp_file = "++show tmpFile
@@ -43,12 +47,12 @@ mkCustomPrelude tmpFile = mkTargetMod "OurPrelude" ourPreludeSrc
 customPrintFnStr :: String
 customPrintFnStr = "Printer.ourPrint"
 
-mkModules :: FilePath -> IO [(ModuleName, Target)]
-mkModules tmpFile = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile
-                       printer                   <- mkTargetFile (runtimeSrcDir ++ "/Printer.hs")
-                       let printerName = mkModuleName "Printer"
-                       return [ (preludeName, ourPrelude)
-                              , (printerName, printer)]
+mkModules :: FilePath -> FilePath -> IO [(ModuleName, Target)]
+mkModules tmpFile tmpDir = do (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
+                              printer                   <- mkTargetFile (runtimeSrcDir ++ "/Printer.hs")
+                              let printerName = mkModuleName "Printer"
+                              return [ (preludeName, ourPrelude)
+                                     , (printerName, printer)]
 
 initSession :: FilePath -> FilePath -> IO Session
 initSession tmpFile tmpDir = runGhc (Just libdir) $ do
@@ -60,15 +64,8 @@ initSession tmpFile tmpDir = runGhc (Just libdir) $ do
                                           -- doesn't seem to work, but
                                           -- parseName (below) does
                                           , interactivePrint = Just customPrintFnStr }
-                nflags <- getSessionDynFlags
-                MonadUtils.liftIO $ do putStrLn "Import paths"
-                                       print $ importPaths nflags
-                                       putStrLn "Include paths"
-                                       print $ includePaths nflags
-                                       putStrLn "libary paths"
-                                       print $ libraryPaths nflags
 
-                modules <- MonadUtils.liftIO $ mkModules tmpFile
+                modules <- MonadUtils.liftIO $ mkModules tmpFile tmpDir
                 mapM_ (addTarget . snd) modules
 
                 sFlag <- load LoadAllTargets
@@ -82,24 +79,42 @@ initSession tmpFile tmpDir = runGhc (Just libdir) $ do
                              (name:_) <- parseName customPrintFnStr
                              modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
                                                    in he { hsc_IC = new_ic })
+
                              -- reifyGhc takes a function of (Session -> IO a) and
                              -- returns Ghc a.  we use it here to get and return
                              -- the Session:
                              reifyGhc return
 
-addModule :: String -> Ghc ()
-addModule code = let target = buildTarget code
-                 in do
-                   addTarget target
-                   sFlag <- load LoadAllTargets
-                   setContext [IIModule $ mkModuleName "TestModule1"]
+evalModule :: Int -> String -> StateT EvalState Ghc Output
+evalModule cId code = do 
+  let moduleName = ("Module"++show cId)
+      fullModule = "module "++moduleName++" where\n\n"++code
+  tmpDir <- gets estateTmpDir
+  
+  -- do a bunch of work in the ghc monad:
+  lift $ do (mName, target) <- MonadUtils.liftIO $ mkTargetMod tmpDir moduleName fullModule
+            addTarget target
 
-                   case sFlag of
-                     Failed    -> error "Compliation Failed"
-                     Succeeded -> return () -- no output when loading modules.
+            sFlag <- load LoadAllTargets -- throws SourceError
+            case sFlag of
+              Failed    -> do MonadUtils.liftIO $ putStrLn "load failed"
+                              return $ CompileError "Error loading module"
+              Succeeded -> do setContext [ IIModule mName
+                                           -- add the base modules:
+                                         , IIModule $ mkModuleName "OurPrelude"
+                                         , IIModule $ mkModuleName "Printer"]
 
-buildTarget :: String -> Target
-buildTarget = undefined
+                              -- names <- getNamesInScope
+                              -- MonadUtils.liftIO $ putStrLn "names---"
+                              -- MonadUtils.liftIO $ mapM_ (printOut flags) names
+                              -- MonadUtils.liftIO $ putStrLn "---end names"
+
+                              (name:_) <- parseName customPrintFnStr
+                              modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                                                    in he { hsc_IC = new_ic })
+
+                              return Output { outputCellNo = cId
+                                            , outputData = "(module parsed)" }
 
 evalStmt :: Int -> String -> StateT EvalState Ghc Output
 evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
@@ -121,9 +136,8 @@ runResultToStr (RunOk ns)      = "RunOk " ++ (show $ length ns)
 runResultToStr (RunException e) = "RunException " ++ show e
 runResultToStr RunBreak {}     = "RunBreak"
 
--- showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
---                      in runSDoc (ppr name) ctx
--- printOut flags name = print $ showOut flags name
+showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
+                     in runSDoc (ppr name) ctx
+printOut flags name = print $ showOut flags name
 
--- evalModule :: Int -> String -> State EvalState Output
--- evalModule cId code = do 
+-- lifter x = lift $ MonadUtils.liftIO x

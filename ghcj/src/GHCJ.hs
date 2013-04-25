@@ -24,4 +24,11 @@ evalJsonLine jsonLine = case AE.decode jsonLine of
                           Just input -> evaluate input
 
 evaluate :: Input -> StateT EvalState Ghc Output
-evaluate (Input cId stmt) = evalStmt cId stmt
+evaluate (Input cId stmt) = do stmtRes <- evalStmt cId stmt
+                               case stmtRes of 
+                                 Output {} -> return stmtRes
+                                 _         -> do modRes  <- evalModule cId stmt
+                                                 return $ case modRes of
+                                                   Output {} -> modRes
+                                                   _         -> CompileError 
+                                                                (show stmtRes ++ "\n---\n" ++ show modRes)
