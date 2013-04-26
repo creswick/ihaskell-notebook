@@ -36,7 +36,6 @@ class GhcjMagics(Magics):
         """
         super(GhcjMagics, self).__init__(shell)
         self._ghcj = ghcj2py.Ghcj2Py()
-        self._publish_display_data = publish_display_data
 
     @skip_doctest
     @magic_arguments()
@@ -64,14 +63,7 @@ class GhcjMagics(Magics):
             raise GhcjMagicError('ghcj could not complete execution: %s' % msg)
 
         key = 'ghcjMagic.ghcj'
-        display_data = []
-
-        # Publish text output
-        if text_output:
-            display_data.append((key, {'text/plain': text_output}))
-
-        for source, data in display_data:
-            self._publish_display_data(source, data)
+        publish_display_data(key, {'text/plain': text_output})
 
 
 def load_ipython_extension(ip):
@@ -80,11 +72,13 @@ def load_ipython_extension(ip):
     ip.register_magics(GhcjMagics)
 
     def new_run_cell(self, raw_cell, **kwds):
-        self.run_cell_magic('ghcj', '', raw_cell)  # ignore **kwds
+        newcell = '%%ghcj\n' + raw_cell
+        self.old_run_cell(newcell, **kwds)
 
     from IPython.core.interactiveshell import InteractiveShell
     func_type = type(InteractiveShell.run_cell)
-    #ip.run_cell = func_type(new_run_cell, ip, InteractiveShell)
+    ip.old_run_cell = ip.run_cell
+    ip.run_cell = func_type(new_run_cell, ip, InteractiveShell)
 
 
 class GhcjMagicError(Exception):
