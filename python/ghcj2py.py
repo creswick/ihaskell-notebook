@@ -64,7 +64,7 @@ class Ghcj2Py:
         return res
 
     def send(self, txt):
-        self.child.sendline(txt + '\n')
+        self.child.sendline(txt)
 
     def recv(self):
         self.child.expect('"([a-zA-Z0-9+/=]+)"')
