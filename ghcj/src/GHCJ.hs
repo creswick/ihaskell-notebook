@@ -21,7 +21,7 @@ evalLine encLine = case B64.decode $ C8.pack encLine of
 evalJsonLine :: BL.ByteString -> StateT EvalState Ghc Output
 evalJsonLine jsonLine = case AE.decode jsonLine of
                           Nothing    -> return $ ParseError 
-                                           ("JSON Decode falied." ++ (show jsonLine))
+                                           ("JSON Decode failed." ++ (show jsonLine))
                           Just input -> evaluate input
 
 evaluate :: Input -> StateT EvalState Ghc Output
