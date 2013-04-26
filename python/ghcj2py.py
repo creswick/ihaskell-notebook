@@ -14,7 +14,6 @@ import base64
 import json
 import os
 import pexpect
-#import sys
 
 
 class Ghcj2Py:
@@ -28,13 +27,6 @@ class Ghcj2Py:
         #self.child.logfile = sys.stdout
 
     def run(self, code, verbose=False):
-        results = self.send_code(code, verbose=verbose)
-
-        # error checking?
-        if results == "":
-            return "<EMPTY>"
-
-    def send_code(self, code, verbose=False):
         if verbose:
             print "---sending command---\n"
             print code
