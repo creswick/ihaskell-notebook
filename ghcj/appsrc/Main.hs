@@ -1,6 +1,6 @@
 module Main where
 
-
+import Data.Char (isSpace)
 import Control.Monad.State (runStateT)
 import Control.Monad.Trans (lift)
 import Data.Data (Data)
@@ -40,9 +40,11 @@ main = do withSystemTempDirectory "iHaskell.shared" $ \tdir -> do
             return ()
          --loop :: StateT EvalState Ghc b
     where loop = do input <- lift $ liftIO getLine
-                    result <- evalLine input
-                    lift $ liftIO $ print $ toB64Json result
-                    loop
+                    case trim input of
+                      [] -> loop
+                      _  -> do result <- evalLine input
+                               lift $ liftIO $ print $ toB64Json result
+                               loop
 
 toB64Json :: Data.Data.Data a => a -> B.ByteString
 toB64Json r = B64.encode $ toStrict $ AE.encode r
@@ -50,6 +52,9 @@ toB64Json r = B64.encode $ toStrict $ AE.encode r
 toStrict :: BL.ByteString -> B.ByteString
 toStrict = B.concat . BL.toChunks
 
+trim :: String -> String
+trim = f . f
+   where f = reverse . dropWhile isSpace
 
 -- -- | Install some default exception handlers and run the inner computation.
 -- -- Unless you want to handle exceptions yourself, you should wrap this around
