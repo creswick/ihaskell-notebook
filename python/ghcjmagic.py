@@ -5,14 +5,6 @@ ghcjmagic
 ===========
 
 Magics for interacting with ghcj via ghcj2py
-
-{GHCJ_DOC}
-
-Usage
-=====
-
-``%ghcj``
-
 """
 
 #-----------------------------------------------------------------------------
@@ -31,10 +23,6 @@ from IPython.core.magic_arguments import (argument, magic_arguments,
                                           parse_argstring)
 
 
-class GhcjMagicError:
-    pass
-
-
 @magics_class
 class GhcjMagics(Magics):
     """A set of magics useful for interactive work with Octave via oct2py.
@@ -48,6 +36,7 @@ class GhcjMagics(Magics):
         """
         super(GhcjMagics, self).__init__(shell)
         self._ghcj = ghcj2py.Ghcj2Py()
+        self._publish_display_data = publish_display_data
 
     @skip_doctest
     @magic_arguments()
@@ -57,8 +46,8 @@ class GhcjMagics(Magics):
     @cell_magic
     def ghcj(self, line, cell=None, local_ns=None):
         '''
-        Execute code in ghcj, and pull some of the results back into the
-        Python namespace.
+        Execute code in ghcj and return results including errors if there are
+        any.
         '''
 
         args = parse_argstring(self.ghcj, line)
@@ -82,10 +71,7 @@ class GhcjMagics(Magics):
             display_data.append((key, {'text/plain': text_output}))
 
         for source, data in display_data:
-            publish_display_data(source, data)
-
-
-__doc__ = __doc__.format(GHCJ_DOC=' '*8 + GhcjMagics.ghcj.__doc__,)
+            self._publish_display_data(source, data)
 
 
 def load_ipython_extension(ip):
@@ -98,4 +84,8 @@ def load_ipython_extension(ip):
 
     from IPython.core.interactiveshell import InteractiveShell
     func_type = type(InteractiveShell.run_cell)
-    ip.run_cell = func_type(new_run_cell, ip, InteractiveShell)
+    #ip.run_cell = func_type(new_run_cell, ip, InteractiveShell)
+
+
+class GhcjMagicError(Exception):
+    pass

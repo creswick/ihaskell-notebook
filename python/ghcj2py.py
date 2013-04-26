@@ -67,7 +67,7 @@ class Ghcj2Py:
         self.child.sendline(txt + '\n')
 
     def recv(self):
-        self.child.expect('"(.+)"')
+        self.child.expect('"([a-zA-Z0-9+/=]+)"')
         if self.child.match:
             return self.child.match.group(1)
         else:
@@ -81,35 +81,28 @@ def setup_ghcj_process(cmd):
     try:
         child = pexpect.spawn(cmd)
     except:
-        raise Ghcj2PyError('failed to start ghcj process')
+        raise Ghcj2PyError('failed to start ghcj with command: %s' % cmd)
 
     return child
 
 
-JSON_INPUT_CELL = 'inputCellNo'
-JSON_INPUT_CODE = 'inputSource'
-
-
 def to_json(code):
-    #obj = {'Input': {JSON_INPUT_CELL: 0, JSON_INPUT_CODE: code}}
-    obj = {JSON_INPUT_CELL: 0, JSON_INPUT_CODE: code}
+    "Return the input code wrapped in a specific way in JSON."
+    obj = {'inputCellNo': 0, 'inputSource': code}
     return json.dumps(obj)
 
 
-JSON_OUTPUT_CELL = 'outputCellNo'
-JSON_RESULT_FIELD = 'outputData'
-
-
 def from_json(js):
+    "Return the text output encapsulated in a JSON value returned by `ghcj`."
     obj = json.loads(js)
     if 'ParseError' in obj:
         return obj['ParseError']
-    elif 'CompilerError' in obj:
-        return obj['CompilerError']
-    elif 'CompilerWarning' in obj:
-        return obj['CompilerWarning']
+    elif 'CompileError' in obj:
+        return obj['CompileError']
+    elif 'CompileWarning' in obj:
+        return obj['CompileWarning']
     elif 'Output' in obj:
-        return obj['Output'][JSON_RESULT_FIELD]
+        return obj['Output']['outputData']
     else:
         raise Ghcj2PyError('unexpected JSON content from ghcj: %s' % js)
 

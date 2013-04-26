@@ -9,7 +9,6 @@
 #
 
 IHNB_ROOT=~/ihaskell-notebook
-
 GHCJ_BINARY=$IHNB_ROOT/ghcj/dist/build/ghcj/ghcj
 IPNB_MAGICS=$IHNB_ROOT/python
 
@@ -17,5 +16,7 @@ IPNB_MAGICS=$IHNB_ROOT/python
 # Leave everything below this line alone
 #
 
+export IHNB_ROOT
+export GHCJ_BINARY
 export PYTHONPATH=$PYTHONPATH:$IPNB_MAGICS
 ipython notebook
