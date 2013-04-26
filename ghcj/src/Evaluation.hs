@@ -54,15 +54,16 @@ customPrintFnStr :: String
 customPrintFnStr = "Printer.ourPrint"
 
 mkModules :: FilePath -> FilePath -> IO [(ModuleName, Target)]
-mkModules tmpFile tmpDir = do env <- getEnvironment
-                              let rootDir = case lookup "IHNB_ROOT" env of
-                                              Nothing   -> "."
-                                              Just path -> path
-                              (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
-                              printer                   <- mkTargetFile (mkPath [rootDir, "ghcj", runtimeSrcDir, "Printer.hs"])
-                              let printerName = mkModuleName "Printer"
-                              return [ (preludeName, ourPrelude)
-                                     , (printerName, printer)]
+mkModules tmpFile tmpDir = do
+  env <- getEnvironment
+  let ghcjDir = case lookup "IHNB_ROOT" env of
+                  Nothing   -> "."
+                  Just path -> mkPath [path, "ghcj"]
+  (preludeName, ourPrelude) <- mkCustomPrelude tmpFile tmpDir
+  printer                   <- mkTargetFile (mkPath [ghcjDir, runtimeSrcDir, "Printer.hs"])
+  let printerName = mkModuleName "Printer"
+  return [ (preludeName, ourPrelude)
+         , (printerName, printer)]
 
 initSession :: FilePath -> FilePath -> IO Session
 initSession tmpFile tmpDir = runGhc (Just libdir) $ do
