@@ -1,10 +1,12 @@
 module Evaluation where
 
+import Bag (foldrBag, lengthBag)
 import Control.Monad.State
 import System.IO (writeFile)
 import System.Environment (getEnvironment)
 import Data.List (intercalate)
 
+import Exception (ExceptionMonad)
 import GHC
 import GhcMonad
 import GHC.Paths
@@ -81,20 +83,20 @@ initSession tmpFile tmpDir = runGhc (Just libdir) $ do
 
                 sFlag <- load LoadAllTargets
                 case sFlag of
-                  Failed    -> error "Could not initialize session."
-                  Succeeded -> do
-                             setContext $ map (IIModule . fst)  modules
-                             -- setContext [ IIModule $ mkModuleName "OurPrelude"
-                             --            , IIModule $ mkModuleName "Printer"]
+                     Failed    -> error "Could not initialize session."
+                     Succeeded -> do
+                                setContext $ map (IIModule . fst)  modules
+                                -- setContext [ IIModule $ mkModuleName "OurPrelude"
+                                --            , IIModule $ mkModuleName "Printer"]
 
-                             (name:_) <- parseName customPrintFnStr
-                             modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
-                                                   in he { hsc_IC = new_ic })
+                                (name:_) <- parseName customPrintFnStr
+                                modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                                                      in he { hsc_IC = new_ic })
 
-                             -- reifyGhc takes a function of (Session -> IO a) and
-                             -- returns Ghc a.  we use it here to get and return
-                             -- the Session:
-                             reifyGhc return
+                                -- reifyGhc takes a function of (Session -> IO a) and
+                                -- returns Ghc a.  we use it here to get and return
+                                -- the Session:
+                                reifyGhc return
 
 evalModule :: Int -> String -> StateT EvalState Ghc Output
 evalModule cId code = do 
@@ -107,26 +109,28 @@ evalModule cId code = do
             removeTarget $ targetId target
             addTarget target
 
-            sFlag <- load LoadAllTargets -- throws SourceError
-            case sFlag of
-              Failed    -> do MonadUtils.liftIO $ putStrLn "load failed"
-                              return $ CompileError "Error loading module"
-              Succeeded -> do setContext [ IIModule mName
-                                           -- add the base modules:
-                                         , IIModule $ mkModuleName "OurPrelude"
-                                         , IIModule $ mkModuleName "Printer"]
+            handleSourceError srcErrorHdlr $
+             do sFlag <- load LoadAllTargets -- throws SourceError
+                case sFlag of
+                  Failed    -> do MonadUtils.liftIO $ putStrLn "load failed"
+                                  return $ CompileError "Error loading module"
+                  Succeeded -> do setContext [ IIModule mName
+                                             -- add the base modules:
+                                             , IIModule $ mkModuleName "OurPrelude"
+                                             , IIModule $ mkModuleName "Printer"]
 
-                              -- names <- getNamesInScope
-                              -- MonadUtils.liftIO $ putStrLn "names---"
-                              -- MonadUtils.liftIO $ mapM_ (printOut flags) names
-                              -- MonadUtils.liftIO $ putStrLn "---end names"
+                                  -- names <- getNamesInScope
+                                  -- MonadUtils.liftIO $ putStrLn "names---"
+                                  -- MonadUtils.liftIO $ mapM_ (printOut flags) names
+                                  -- MonadUtils.liftIO $ putStrLn "---end names"
 
-                              (name:_) <- parseName customPrintFnStr
-                              modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
-                                                    in he { hsc_IC = new_ic })
+                                  (name:_) <- parseName customPrintFnStr
+                                  modifySession (\he -> let new_ic = setInteractivePrintName (hsc_IC he) name
+                                                        in he { hsc_IC = new_ic })
 
-                              return Output { outputCellNo = cId
-                                            , outputData = "(module parsed)" }
+                                  return Output { outputCellNo = cId
+                                                , outputData = "(module parsed)" }
+
 
 evalStmt :: Int -> String -> StateT EvalState Ghc Output
 evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion) errHandler
@@ -151,3 +155,8 @@ runResultToStr RunBreak {}     = "RunBreak"
 showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
                      in runSDoc (ppr name) ctx
 printOut flags name = print $ showOut flags name
+
+srcErrorHdlr :: ExceptionMonad m => SourceError -> m Output
+srcErrorHdlr srcErr = return $ CompileError (showErrThing $ srcErrorMessages srcErr)
+
+showErrThing err = foldrBag (\a r -> r ++ (show a)) "" err

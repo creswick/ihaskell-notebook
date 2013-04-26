@@ -3,6 +3,7 @@ where
 
 import Control.Monad.State
 import GHC
+import Bag (foldrBag, lengthBag)
 
 import qualified Data.Aeson.Generic as AE
 import qualified Data.ByteString.Lazy as BL (fromChunks, ByteString)
@@ -24,11 +25,24 @@ evalJsonLine jsonLine = case AE.decode jsonLine of
                           Just input -> evaluate input
 
 evaluate :: Input -> StateT EvalState Ghc Output
-evaluate (Input cId stmt) = do stmtRes <- evalStmt cId stmt
-                               case stmtRes of 
-                                 Output {} -> return stmtRes
-                                 _         -> do modRes  <- evalModule cId stmt
-                                                 return $ case modRes of
-                                                   Output {} -> modRes
-                                                   _         -> CompileError 
-                                                                (show stmtRes ++ "\n---\n" ++ show modRes)
+evaluate (Input cId stmt) = 
+    do stmtRes <- evalStmt cId stmt
+       case stmtRes of 
+         Output {} -> return stmtRes
+         _         ->
+             do modRes  <- evalModule cId stmt
+                case modRes of
+                  Output {} -> return modRes
+                  _         -> return $ CompileError (show stmtRes ++"\n"++show modRes)
+                      -- do dflags <- lift $ getSessionDynFlags
+                      --    return $ parseSource dflags cId stmt 
+
+parseSource :: DynFlags -> Int -> String -> Output
+parseSource dflags cId src = 
+--  Either ErrorMessages (WarningMessages, Located (HsModule RdrName))
+    case parser src dflags ("iHaskell cell: " ++ show cId) of
+      Left err          -> CompileError $ showErrThing err
+      Right (warn, loc) -> CompileWarning $ "source: "++src++
+                             "\nloc: "++(show $ showOut dflags loc)++
+                             "\ncount: "++ (show $ lengthBag warn) ++
+                             showErrThing warn
