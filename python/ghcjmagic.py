@@ -72,7 +72,10 @@ def load_ipython_extension(ip):
     ip.register_magics(GhcjMagics)
 
     def new_run_cell(self, raw_cell, **kwds):
-        newcell = '%%ghcj\n' + raw_cell
+        if raw_cell.startswith("%%ghcj"):
+            newcell = raw_cell
+        else:
+            newcell = '%%ghcj\n' + raw_cell
         self.old_run_cell(newcell, **kwds)
 
     from IPython.core.interactiveshell import InteractiveShell
