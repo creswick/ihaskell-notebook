@@ -2,7 +2,8 @@ module Evaluation where
 
 import Bag (foldrBag, lengthBag)
 import Control.Monad.State
-import System.IO (writeFile, stdout, stderr)
+import System.IO (IOMode(..), stdout, stderr, openFile, hClose, writeFile)
+import qualified System.IO.Strict as IOS (readFile)
 import System.IO.Silently (hCapture)
 import System.Environment (getEnvironment)
 import Data.List (intercalate)
@@ -135,32 +136,6 @@ evalModule cId code = do
 wrappedLoadAll :: Ghc (String, SuccessFlag)
 wrappedLoadAll = reifyGhc (\s -> hCapture [stdout, stderr] (reflectGhc (load LoadAllTargets) s))
                    
-
--- -- | Run an IO action while preventing and capturing all output to the
--- -- given handles.  This will, as a side effect, create and delete a
--- -- temp file in the temp directory or current directory if there is no
--- -- temp directory.
--- hCapture ::  GhcMonad m => FilePath -> [Handle] -> m a -> m (String, a)
--- hCapture tmpDir handles action = MonadUtils.liftIO $ do
---   E.bracket (openTempFile tmpDir "capture")
---             cleanup
---             (prepareAndRun . snd)
---  where
---   cleanup (tmpFile,tmpHandle) = do
---     hClose tmpHandle
---     removeFile tmpFile
-
---   prepareAndRun tmpHandle = go handles
---     where
---       go [] = do
---               a <- action
---               mapM_ hFlush handles
---               hSeek tmpHandle AbsoluteSeek 0
---               str <- hGetContents tmpHandle
---               str `deepseq` return (str,a)
---       go hs = goBracket go tmpHandle hs
-                    
-
 srcErrorHdlr :: ExceptionMonad m => SourceError -> m Output
 srcErrorHdlr srcErr = return $ CompileError ("srcErrorHdlr" ++ (showErrThing $ srcErrorMessages srcErr))
 
@@ -181,7 +156,14 @@ evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion)
 
 -- | Get the value of 'it' from the temp file.
 getItVal :: FilePath -> IO String
-getItVal path = readFile path
+getItVal path = do val <- IOS.readFile path
+                   clearTmpFile path
+                   return val
+
+-- | TODO put some exception handling in here (just in case)
+clearTmpFile :: FilePath -> IO ()
+clearTmpFile file = do hdl <- openFile file WriteMode
+                       hClose hdl
 
 runResultToStr :: RunResult -> String
 runResultToStr (RunOk ns)      = "RunOk " ++ (show $ length ns)

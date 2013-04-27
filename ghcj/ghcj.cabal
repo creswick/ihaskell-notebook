@@ -26,7 +26,8 @@ Library
                      base64-bytestring,
                      time,
                      temporary,
-                     silently
+                     silently,
+                     strict
 
    exposed-modules:  GHCJ, Types, Evaluation
 

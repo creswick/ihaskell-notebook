@@ -29,7 +29,7 @@ evaluate (Input cId stmt) =
     do stmtRes <- evalStmt cId stmt
        case stmtRes of 
          Output {} -> return stmtRes
-         _         ->
+         _         -> 
              do modRes  <- evalModule cId stmt
                 case modRes of
                   Output {} -> return modRes
