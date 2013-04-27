@@ -2,7 +2,8 @@ module Evaluation where
 
 import Bag (foldrBag, lengthBag)
 import Control.Monad.State
-import System.IO (writeFile)
+import System.IO (writeFile, stdout, stderr)
+import System.IO.Silently (hCapture)
 import System.Environment (getEnvironment)
 import Data.List (intercalate)
 
@@ -109,11 +110,11 @@ evalModule cId code = do
             removeTarget $ targetId target
             addTarget target
 
+            -- MonadUtils.liftIO $ print "About to load"
             handleSourceError srcErrorHdlr $
-             do sFlag <- load LoadAllTargets -- throws SourceError
+             do (str, sFlag) <- wrappedLoadAll
                 case sFlag of
-                  Failed    -> do MonadUtils.liftIO $ putStrLn "load failed"
-                                  return $ CompileError "Error loading module"
+                  Failed    -> return $ CompileError ("Error loading module:\n"++str)
                   Succeeded -> do setContext [ IIModule mName
                                              -- add the base modules:
                                              , IIModule $ mkModuleName "OurPrelude"
@@ -129,7 +130,42 @@ evalModule cId code = do
                                                         in he { hsc_IC = new_ic })
 
                                   return Output { outputCellNo = cId
-                                                , outputData = "(module parsed)" }
+                                                , outputData = "(module parsed: "++str++")" }
+
+wrappedLoadAll :: Ghc (String, SuccessFlag)
+wrappedLoadAll = reifyGhc (\s -> hCapture [stdout, stderr] (reflectGhc (load LoadAllTargets) s))
+                   
+
+-- -- | Run an IO action while preventing and capturing all output to the
+-- -- given handles.  This will, as a side effect, create and delete a
+-- -- temp file in the temp directory or current directory if there is no
+-- -- temp directory.
+-- hCapture ::  GhcMonad m => FilePath -> [Handle] -> m a -> m (String, a)
+-- hCapture tmpDir handles action = MonadUtils.liftIO $ do
+--   E.bracket (openTempFile tmpDir "capture")
+--             cleanup
+--             (prepareAndRun . snd)
+--  where
+--   cleanup (tmpFile,tmpHandle) = do
+--     hClose tmpHandle
+--     removeFile tmpFile
+
+--   prepareAndRun tmpHandle = go handles
+--     where
+--       go [] = do
+--               a <- action
+--               mapM_ hFlush handles
+--               hSeek tmpHandle AbsoluteSeek 0
+--               str <- hGetContents tmpHandle
+--               str `deepseq` return (str,a)
+--       go hs = goBracket go tmpHandle hs
+                    
+
+srcErrorHdlr :: ExceptionMonad m => SourceError -> m Output
+srcErrorHdlr srcErr = return $ CompileError ("srcErrorHdlr" ++ (showErrThing $ srcErrorMessages srcErr))
+
+showErrThing err = foldrBag (\a r -> r ++ (show a)) "" err
+
 
 
 evalStmt :: Int -> String -> StateT EvalState Ghc Output
@@ -155,8 +191,3 @@ runResultToStr RunBreak {}     = "RunBreak"
 showOut flags name = let ctx = initSDocContext flags defaultDumpStyle
                      in runSDoc (ppr name) ctx
 printOut flags name = print $ showOut flags name
-
-srcErrorHdlr :: ExceptionMonad m => SourceError -> m Output
-srcErrorHdlr srcErr = return $ CompileError (showErrThing $ srcErrorMessages srcErr)
-
-showErrThing err = foldrBag (\a r -> r ++ (show a)) "" err
