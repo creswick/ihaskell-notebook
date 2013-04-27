@@ -57,13 +57,14 @@ class GhcjMagics(Magics):
             code = cell
 
         try:
-            text_output = self._ghcj.run(code, verbose=args.verbose)
+            output = self._ghcj.run(code, verbose=args.verbose)
         except (ghcj2py.Ghcj2PyError) as exception:
             msg = exception.message
             raise GhcjMagicError('ghcj could not complete execution: %s' % msg)
 
         key = 'ghcjMagic.ghcj'
-        publish_display_data(key, {'text/plain': text_output})
+        # publish_display_data(key, {'text/plain': text_output})
+        publish_display_data(key, output)
 
 
 def load_ipython_extension(ip):

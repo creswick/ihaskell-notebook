@@ -88,16 +88,19 @@ def from_json(js):
     "Return the text output encapsulated in a JSON value returned by `ghcj`."
     obj = json.loads(js)
     if 'ParseError' in obj:
-        return obj['ParseError']
+        return txt_plain(obj['ParseError'])
     elif 'CompileError' in obj:
-        return obj['CompileError']
+        return txt_plain(obj['CompileError']['outputErr'])
     elif 'CompileWarning' in obj:
-        return obj['CompileWarning']
+        return txt_plain(obj['CompileWarning']['outputWarn'])
     elif 'Output' in obj:
-        return obj['Output']['outputData']
+        return { obj['Output']['outputMimeType'] :
+                 obj['Output']['outputData'] }
     else:
         raise Ghcj2PyError('unexpected JSON content from ghcj: %s' % js)
 
+def txt_plain(str):
+    return {'text/plain': str}
 
 class Ghcj2PyError(Exception):
     pass

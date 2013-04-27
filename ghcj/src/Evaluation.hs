@@ -131,7 +131,9 @@ evalModule cId code = do
                                                         in he { hsc_IC = new_ic })
 
                                   return Output { outputCellNo = cId
-                                                , outputData = "(module parsed: "++str++")" }
+                                                , outputData = "(module parsed: "++str++")"
+                                                , outputMimeType = "text/plain"
+                                                }
 
 wrappedLoadAll :: Ghc (String, SuccessFlag)
 wrappedLoadAll = reifyGhc (\s -> hCapture [stdout, stderr] (reflectGhc (load LoadAllTargets) s))
@@ -149,16 +151,18 @@ evalStmt cId stmt = do runResult <- lift $ gcatch (runStmt stmt RunToCompletion)
                          RunBreak {}      -> return $ CompileError "RunBreak"
                          (RunException e) -> return (CompileError $ show e)
                          (RunOk _)        -> do tmpFile <- gets estateTmpFile
-                                                itVal <- lift $ MonadUtils.liftIO $ getItVal tmpFile
+                                                (mimeType, itVal) <- lift $ MonadUtils.liftIO $ getItVal tmpFile
                                                 return Output { outputCellNo = cId
-                                                              , outputData = itVal }
+                                                              , outputData = itVal 
+                                                              , outputMimeType = mimeType }
     where errHandler e = return $ RunException e
 
 -- | Get the value of 'it' from the temp file.
-getItVal :: FilePath -> IO String
+getItVal :: FilePath -> IO (String, String)
 getItVal path = do val <- IOS.readFile path
                    clearTmpFile path
-                   return val
+                   let (mimeType:result) = lines val
+                   return (mimeType, unlines result)
 
 -- | TODO put some exception handling in here (just in case)
 clearTmpFile :: FilePath -> IO ()

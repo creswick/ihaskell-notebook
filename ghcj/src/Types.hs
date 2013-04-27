@@ -11,10 +11,11 @@ data Input = Input { inputCellNo :: Int
                    } deriving (Eq, Show, Data, Typeable)
 
 data Output = ParseError String
-            | CompileError String
-            | CompileWarning String
+            | CompileError { outputErr :: String }
+            | CompileWarning { outputWarn :: String }
             | Output { outputCellNo :: Int
                      , outputData   :: String
+                     , outputMimeType :: String
                      }
               deriving (Eq, Show, Data, Typeable)
 
